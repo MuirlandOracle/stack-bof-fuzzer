@@ -1,0 +1,141 @@
+#!/usr/bin/python3
+#Simple network stack BoF Fuzzer
+#Useful for OSCP style Stack Buffer overflows
+#AG | MuirlandOracle
+#11/20
+
+
+
+#### Imports ####
+import socket, time, sys, argparse, signal
+
+
+
+#### Signal Handler ####
+def sigHandler(sig, frame):
+	print("\n\033[34m[*] Exiting....\033[0m")
+	sys.exit(0)
+
+
+
+class Fuzz():
+	
+	#### Colours #### 
+	class colours():
+		red = "\033[91m"
+		green = "\033[92m"
+		blue = "\033[34m"
+		orange = "\033[33m"
+		purple = "\033[35m"
+		end = "\033[0m"
+	
+	def success(self, message):
+		if not self.args.accessible:
+			print(f"{self.colours.green}[+] {message}{self.colours.end}")
+		else:
+			print(f"Success: {message}")
+
+	
+	def warn(self, message):
+		if not self.args.accessible:
+			print(f"{self.colours.orange}[*] {message}{self.colours.end}")
+		else:
+			print(f"Warning: {message}")
+
+
+	def info(self, message):
+		if not self.args.accessible:
+			print(f"{self.colours.blue}[*] {message}{self.colours.end}")
+		else:
+			print(f"Info: {message}")
+
+	def fail(self, message, die=True):
+		if not self.args.accessible:
+			print(f"{self.colours.red}[-] {message}{self.colours.end}")
+		else:
+			print(f"Failure: {message}")
+
+		if not die:
+			sys.exit(0)
+
+
+	banner = (f"""{colours.orange}
+	
+	 ____        _____   _____                       
+	| __ )  ___ |  ___| |  ___|   _ ___________ _ __ 
+	|  _ \ / _ \| |_    | |_ | | | |_  /_  / _ \ '__|
+	| |_) | (_) |  _|   |  _|| |_| |/ / / /  __/ |   
+	|____/ \___/|_|     |_|   \__,_/___/___\___|_|   
+                                                 
+					{colours.purple}@MuirlandOracle
+	
+
+	{colours.end}""")
+		
+	#### Get Arguments ####
+	def parseArgs(self):
+		parser = argparse.ArgumentParser(description="Stack BoF Fuzzer")
+		parser.add_argument("ip", help="The target IP address")
+		parser.add_argument("port", type=int, help="The target port")
+		parser.add_argument("--prefix", default="", help="Command to prefix payloads with")
+		parser.add_argument("--max", "-m", type=int, default=1000, help="Maximum number of bytes to send at one time (default 1000)")
+		parser.add_argument("--min", type=int, default=100, help="Number of bytes to start at (default 100)")
+		parser.add_argument("--interval", "-i", type=int, default=100, help="Interval to send bytes in (default 100)")
+		parser.add_argument("--timeout", "-t", type=int, default=5, help="Length of time to wait before assuming the target has died (default 5s)")
+		parser.add_argument("--wait", "-w", type=int, default=1, help="Length of time to wait between sends (default 1s)")
+		parser.add_argument("--accessible", default=False, action="store_true", help="Set fuzzer into accessibility mode")
+		self.args = parser.parse_args()
+
+
+	#### Check Connection to the target ####
+	def connectCheck(self):
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		s.settimeout(self.args.timeout)
+		try:
+			s.connect((self.args.ip, self.args.port))
+			s.recv(1024)
+		except:
+			self.fail(f"Failed to connect to {self.args.ip}:{self.args.port}")
+			sys.exit(0)
+
+		self.success("Connected to the target\n")
+
+
+	
+	def attack(self):
+		#Make sure that the starting buffer is greater than 0
+		buff = self.args.min
+		try:
+			assert(buff > 0)
+		except:
+			self.fail("Number of bytes can't be less than 1")
+
+
+		#Loop through to get the buffer
+		while buff <= self.args.max:
+			try:
+				string="A" * buff
+				s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				s.settimeout(self.args.timeout)
+				s.connect((self.args.ip, self.args.port))
+				s.recv(1024)
+				print(f"Fuzzing with {buff} bytes")
+				s.send(f"{self.args.prefix}{string}".encode())
+				s.recv(1024)
+				s.close()
+			except:
+				print()
+				self.success(f"Failed to connect to target\nThe required buffer to obtain a segfault is between {buff - self.args.interval} and {buff} bytes\n")
+				sys.exit()
+			time.sleep(self.args.wait)
+			buff += self.args.interval
+
+
+if __name__ == "__main__":
+	signal.signal(signal.SIGINT, sigHandler)
+	fuzzer = Fuzz()
+	fuzzer.parseArgs()
+	print(fuzzer.banner)
+	fuzzer.connectCheck()
+	fuzzer.attack()
+
