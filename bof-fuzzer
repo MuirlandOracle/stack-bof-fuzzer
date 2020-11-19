@@ -135,7 +135,10 @@ if __name__ == "__main__":
 	signal.signal(signal.SIGINT, sigHandler)
 	fuzzer = Fuzz()
 	fuzzer.parseArgs()
-	print(fuzzer.banner)
+	if not fuzzer.args.accessible:
+		print(fuzzer.banner)
+	else:
+		print("Stack BoF Fuzzer, coded by @MuirlandOracle")
 	fuzzer.connectCheck()
 	fuzzer.attack()
 
