@@ -125,7 +125,7 @@ class Fuzz():
 				s.close()
 			except:
 				print()
-				self.success(f"Failed to connect to target\nThe required buffer to obtain a segfault is between {buff - self.args.interval} and {buff} bytes\n")
+				self.success(f"Failed to connect to target\nThe required buffer to obtain a segfault is {buff} bytes\n")
 				sys.exit()
 			time.sleep(self.args.wait)
 			buff += self.args.interval
